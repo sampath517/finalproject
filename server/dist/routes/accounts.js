@@ -1,0 +1,224 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const user_1 = __importDefault(require("../models/user"));
+const utils_1 = require("../utils/utils");
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const token_1 = require("../middlewares/token");
+require("dotenv");
+const bad_words_1 = __importDefault(require("bad-words"));
+const problem_1 = __importDefault(require("../models/problem"));
+const accounts = express_1.default.Router();
+accounts.post("/signup", async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+        if (!username || !email || !password) {
+            res.status(400).json({
+                success: false,
+                message: "Missing required fields.",
+            });
+            return;
+        }
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
+        const usernameRegex = /^[a-zA-Z0-9_-]{3,15}$/;
+        if (!emailRegex.test(email)) {
+            res.status(400).json({
+                success: false,
+                message: "Email is not valid.",
+            });
+            return;
+        }
+        if (!passwordRegex.test(password)) {
+            res.status(400).json({
+                success: false,
+                message: "Password is not valid. Password must contain at least one letter (uppercase or lowercase) and one digit, and must be at least 8 characters in length.",
+            });
+            return;
+        }
+        if (!usernameRegex.test(username)) {
+            res.status(400).json({
+                success: false,
+                message: "Username must be between 3 to 15 characters and can only contain letters, numbers, hyphens, and underscores.",
+            });
+            return;
+        }
+        const filter = new bad_words_1.default();
+        if (filter.isProfane(username)) {
+            res.status(400).json({
+                success: false,
+                message: "Username contains inappropriate language.",
+            });
+            return;
+        }
+        if (await (0, utils_1.existsUsername)(username)) {
+            res.status(409).json({
+                success: false,
+                message: "Username already exists.",
+            });
+            return;
+        }
+        else if (await (0, utils_1.existsEmail)(email)) {
+            res.status(409).json({
+                success: false,
+                message: "Email already exists.",
+            });
+            return;
+        }
+        const hashedPas = await bcryptjs_1.default.hash(password, 10);
+        const user = {
+            username: username,
+            email: email,
+            password: hashedPas,
+        };
+        const userModel = new user_1.default(user);
+        await userModel.save();
+        const userFromDb = await user_1.default.findOne({
+            username: username,
+            email: email,
+            password: hashedPas,
+        });
+        const id = userFromDb ? userFromDb.id.toString() : "none";
+        const token = jsonwebtoken_1.default.sign(user.username, "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE3MTE5MTAzMjUsImV4cCI6MTc0MzQ0NjMyNSwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwic3ViIjoianJvY2tldEBleGFtcGxlLmNvbSIsIkdpdmVuTmFtZSI6IkpvaG5ueSIsIlN1cm5hbWUiOiJSb2NrZXQiLCJFbWFpbCI6Impyb2NrZXRAZXhhbXBsZS5jb20iLCJSb2xlIjpbIk1hbmFnZXIiLCJQcm9qZWN0IEFkbWluaXN0cmF0b3IiXX0.wExoY22MGhSF6dgfNcb6vLMJFuSd3IqhCEDA25Aobz8");
+        console.log("User '", user.username, "' signed up at ", new Date());
+        res.status(201).json({
+            token: token,
+            id: id,
+            success: true,
+            message: "Account created successfully",
+        });
+    }
+    catch (e) {
+        res.status(500).json({
+            success: false,
+            message: "Error creating account",
+        });
+    }
+});
+accounts.post("/login", async (req, res) => {
+    const { username_or_email, password } = req.body;
+    if (!username_or_email || !password) {
+        res.status(400).json({
+            success: false,
+            message: "Missing required fields",
+        });
+        return;
+    }
+    try {
+        const user = await user_1.default.findOne({
+            $or: [
+                { username: username_or_email },
+                { email: username_or_email },
+            ],
+        });
+        if (user == null) {
+            res.status(400).json({
+                success: false,
+                message: "Username or Email doesn't exists",
+            });
+            return;
+        }
+        if (await bcryptjs_1.default.compare(password, user.password)) {
+            const token = jsonwebtoken_1.default.sign(user.username, "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJPbmxpbmUgSldUIEJ1aWxkZXIiLCJpYXQiOjE3MTE5MTAzMjUsImV4cCI6MTc0MzQ0NjMyNSwiYXVkIjoid3d3LmV4YW1wbGUuY29tIiwic3ViIjoianJvY2tldEBleGFtcGxlLmNvbSIsIkdpdmVuTmFtZSI6IkpvaG5ueSIsIlN1cm5hbWUiOiJSb2NrZXQiLCJFbWFpbCI6Impyb2NrZXRAZXhhbXBsZS5jb20iLCJSb2xlIjpbIk1hbmFnZXIiLCJQcm9qZWN0IEFkbWluaXN0cmF0b3IiXX0.wExoY22MGhSF6dgfNcb6vLMJFuSd3IqhCEDA25Aobz8");
+            console.log("User '", user.username, "' logged in at ", new Date());
+            res.json({
+                token: token,
+                id: user.id,
+                success: true,
+                message: "Logged in successfully",
+            });
+        }
+        else {
+            console.log("User '", user.username, "' failed login (incorrect password) at ", new Date());
+            res.json({ success: false, message: "Password incorrect" });
+        }
+    }
+    catch (e) {
+        console.log(e);
+        res.status(500).json({ success: false, message: "Error" });
+    }
+});
+accounts.post("/delete/:id", token_1.authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        await user_1.default.findByIdAndDelete(id);
+        res.json({
+            success: true,
+            message: "Account deleted successfully",
+        });
+    }
+    catch (e) {
+        res.json({ success: false, message: e });
+    }
+});
+accounts.get("/id/:id", token_1.authenticateToken, async (req, res) => {
+    const id = req.params.id;
+    const user = await user_1.default.findById(id);
+    if (!user) {
+        res.status(404).json({ success: false, message: "User not found" });
+        return;
+    }
+    res.json(user);
+});
+accounts.get("/:name", async (req, res) => {
+    const name = req.params.name;
+    const user = await user_1.default.findOne({
+        username: name,
+    });
+    if (!user) {
+        res.status(404).json({ success: false, message: "User not found" });
+        return;
+    }
+    let allProblems = await problem_1.default.find();
+    let easyProblems = 0;
+    let mediumProblems = 0;
+    let hardProblems = 0;
+    let easySolved = 0;
+    let mediumSolved = 0;
+    let hardSolved = 0;
+    for (let i = 0; i < allProblems.length; i++) {
+        if (allProblems[i].main.difficulty === "easy") {
+            easyProblems++;
+            if (user.problems_solved.includes(allProblems[i].main.name)) {
+                easySolved++;
+            }
+        }
+        else if (allProblems[i].main.difficulty === "medium") {
+            mediumProblems++;
+            if (user.problems_solved.includes(allProblems[i].main.name)) {
+                mediumSolved++;
+            }
+        }
+        else {
+            hardProblems++;
+            if (user.problems_solved.includes(allProblems[i].main.name)) {
+                hardSolved++;
+            }
+        }
+    }
+    const publicUser = {
+        username: user.username,
+        email: user.email,
+        submissions: user.submissions,
+        problems_starred: user.problems_starred,
+        problems_solved: user.problems_solved,
+        easy_problems_count: easyProblems,
+        medium_problems_count: mediumProblems,
+        hard_problems_count: hardProblems,
+        problems_solved_easy: easySolved,
+        problems_solved_medium: mediumSolved,
+        problems_solved_hard: hardSolved,
+        problems_attempted: user.problems_attempted,
+        problems_solved_count: user.problems_solved_count,
+        rank: user.rank,
+        views: user.views,
+        solution_count: user.solution_count,
+        reputation_count: user.reputation_count,
+    };
+    res.json(publicUser);
+});
+exports.default = accounts;
