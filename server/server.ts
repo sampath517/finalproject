@@ -5,10 +5,10 @@ import router from "./routes/index";
 import mongoose from "mongoose";
 import { customCors } from "./middlewares/cors";
 
-const MONGODB_URI = "mongodb+srv://admin:admin@cluster0.vbk62n4.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
+const MONGODB_URI = "mongodb+srv://admin:admin@abhiramcluster.rjmpiyb.mongodb.net/?retryWrites=true&w=majority&appName=AbhiramCluster";
 console.log(MONGODB_URI);
 
-mongoose.connect(MONGODB_URI);
+mongoose.connect(MONGODB_URI,{dbName:"firecode"});
 
 export const db = mongoose.connection;
 
