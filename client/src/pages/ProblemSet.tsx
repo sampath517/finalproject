@@ -20,11 +20,8 @@ const ProblemSet = ({
     const [problemListData, setProblemListData] = useState();
     const customNavData: Navbar = {
         items: [
-            { text: "All Topics", link_path: "/problemset" },
-            { text: "Algorithms", link_path: "/problemset" },
-            { text: "JavaScript", link_path: "/problemset" },
-            { text: "DataBase", link_path: "/problemset" },
-            { text: "Shell", link_path: "/problemset" },
+            { text: "Coding Problems", link_path: "/problemset" },
+     
         ],
     };
 
